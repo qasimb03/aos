@@ -92,6 +92,9 @@ struct thread
   int priority;              /* Priority. */
   struct list_elem allelem;  /* List element for all threads list. */
 
+  struct list_elem sleepelem; /* List element for sleeping threads list */
+  int64_t wakeuptime; /* Variable for storing wake up time */
+
   /* Shared between thread.c and synch.c. */
   struct list_elem elem; /* List element. */
 

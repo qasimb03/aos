@@ -20,6 +20,11 @@
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
 
+/* List of sleeping processes. Processes are added to this
+   list when they call the thread_sleep function and removed
+   when their time to sleep has been completed. */
+static struct list sleep_list;
+
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
 static unsigned loops_per_tick;
@@ -36,6 +41,7 @@ void timer_init (void)
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
+  list_init (&sleep_list); /* Initalize sleep list */
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -85,8 +91,25 @@ void timer_sleep (int64_t ticks)
   int64_t start = timer_ticks ();
 
   ASSERT (intr_get_level () == INTR_ON);
-  while (timer_elapsed (start) < ticks)
-    thread_yield ();
+
+
+  /* Added code for Project 1 Part 1 */
+  struct thread* currentThread; /* Pointer to current thread */
+  enum intr_level currentInterruptLevel; /* Will hold value of current interrupt level */
+
+  /* Turn interrupts off to can perform atomic operation of adding to sleep list */
+  currentInterruptLevel = intr_disable(); /* Disables interrupts and returns the current interrupt value to be stored in variable */
+  currentThread = thread_current(); /* Stores pointer to current thread in variable */
+
+  currentThread->wakeuptime = timer_ticks() + ticks; /* Sets wake up time of current thread to the current time + ticks */
+
+  list_insert(&sleep_list, &currentThread->sleepelem); /* Pass memory address of sleepelem property and sleep_list to add currentThread to sleep_list*/
+  thread_block(); /* Puts current thread in blocked state (sleep state). To wake up, must call thread_unblock() */
+
+  intr_set_level(currentInterruptLevel); /* Set interrupt level back to what it was previously */
+
+  // while (timer_elapsed (start) < ticks)
+  //   thread_yield ();
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
