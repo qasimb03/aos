@@ -14,8 +14,6 @@ enum thread_status
   THREAD_DYING    /* About to be destroyed. */
 };
 
-bool comparePriority (const struct list_elem *list_item_a, const struct list_elem *list_item_b); /* Function to compare priorities */
-
 /* Thread identifier type.
    You can redefine this to whatever type you like. */
 typedef int tid_t;
@@ -107,6 +105,12 @@ struct thread
 
   /* Owned by thread.c. */
   unsigned magic; /* Detects stack overflow. */
+
+/* --------------------- New for Priority Donation --------------------- */
+  int base_priority;              /* The "original" priority (without donations). */
+  struct lock *waiting_lock;      /* The lock this thread is trying to acquire (may donate). */
+  struct list locks_held;        /* List of locks this thread currently holds. */
+  /* You also need a list_elem in 'struct lock' so each lock can be in locks_held. */
 };
 
 /* If false (default), use round-robin scheduler.
