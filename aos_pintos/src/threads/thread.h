@@ -14,6 +14,8 @@ enum thread_status
   THREAD_DYING    /* About to be destroyed. */
 };
 
+bool comparePriority (const struct list_elem *list_item_a, const struct list_elem *list_item_b); /* Function to compare priorities */
+
 /* Thread identifier type.
    You can redefine this to whatever type you like. */
 typedef int tid_t;

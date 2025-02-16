@@ -32,6 +32,7 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
+
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -64,9 +65,10 @@ void sema_down (struct semaphore *sema)
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
-  while (sema->value == 0)
+  while (sema->value == 0) /* Waiting on resource */
     {
-      list_push_back (&sema->waiters, &thread_current ()->elem);
+      //list_push_back (&sema->waiters, &thread_current ()->elem);
+      list_insert_ordered (&sema->waiters, &thread_current()->elem, comparePriority, NULL); /* Insert thread into waiting list of semaphore in priority order */
       thread_block ();
     }
   sema->value--;
@@ -235,7 +237,12 @@ bool lock_held_by_current_thread (const struct lock *lock)
   return lock->holder == thread_current ();
 }
 
-/* One semaphore in a list. */
+/* One semaphore in a list. 
+
+  Each thread that calls cond_wait creates a semaphore_elem. This semaphore element 
+   contains a semaphore. This semaphore_elem's semaphore's waiter list contains a list of 
+   blocked threads waiting on this semaphore, which is JUST the thread that created the 
+   semaphore_elem (and semaphore). */
 struct semaphore_elem
 {
   struct list_elem elem;      /* List element. */
@@ -274,6 +281,13 @@ void cond_init (struct condition *cond)
    we need to sleep. */
 void cond_wait (struct condition *cond, struct lock *lock)
 {
+   /* Creates a semaphore_elem waiter which 
+   is used to block thread that calls it. The 
+   semaphore_elem's semaphore is decremented to 0,
+   which blocks thread that calls it, and this thread 
+   is added to the semaphore's waiter list (list of threads 
+   waiting on this semaphore -- just contains 1 thread [thread that called it]
+   ).*/
   struct semaphore_elem waiter;
 
   ASSERT (cond != NULL);
@@ -282,9 +296,10 @@ void cond_wait (struct condition *cond, struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
 
   sema_init (&waiter.semaphore, 0);
-  list_push_back (&cond->waiters, &waiter.elem);
+  //list_push_back (&cond->waiters, &waiter.elem);
+  list_insert_ordered (&cond->waiters, &waiter.elem, compareSemaphorePriority, NULL); /* Insert thread into waiting list in priority order */
   lock_release (lock);
-  sema_down (&waiter.semaphore);
+  sema_down (&waiter.semaphore); /* Blocks the thread that is waiting on the condition variable */
   lock_acquire (lock);
 }
 
@@ -302,6 +317,9 @@ void cond_signal (struct condition *cond, struct lock *lock UNUSED)
   ASSERT (!intr_context ());
   ASSERT (lock_held_by_current_thread (lock));
 
+  /* Increments the semaphore associated with the semaphore_elem 
+     in the list of "threads" waiting on this condition variable. 
+     This unblocks the thread that is waiting for this condition variable. */
   if (!list_empty (&cond->waiters))
     sema_up (&list_entry (list_pop_front (&cond->waiters),
                           struct semaphore_elem, elem)
@@ -321,4 +339,28 @@ void cond_broadcast (struct condition *cond, struct lock *lock)
 
   while (!list_empty (&cond->waiters))
     cond_signal (cond, lock);
+}
+
+
+/* Each thread that calls condition variable creates a semaphore_elem. This semaphore element 
+   contains a semaphore. This semaphore_elem's semaphore's waiter list contains a list of 
+   blocked threads waiting on this semaphore, which is JUST the thread that created the 
+   semaphore_elem (and semaphore). 
+   
+   This function is used to get the highest priority thread that is waiting on a condition variable, by
+   seeing which thread has the highest priority. In achieves this by going through the list of semaphore_elem
+   that are waiting on a condition variable (&cond->waiters), going to that semaphore_elem's semaphore, grabbing the thread
+   associated with that semaphore, and checking its priority. */
+bool compareSemaphorePriority (const struct list_elem *list_item_a, const struct list_elem *list_item_b) {
+  struct semaphore_elem *semaphore_elem_a = list_entry(list_item_a, struct semaphore_elem, elem);
+  struct semaphore_elem *semaphore_elem_b = list_entry(list_item_b, struct semaphore_elem, elem);
+
+  if (!list_empty(&semaphore_elem_a->semaphore.waiters) && !list_empty(&semaphore_elem_b->semaphore.waiters)) {
+    struct thread *thread_a = list_entry(list_front(&semaphore_elem_a->semaphore.waiters), struct thread, elem);
+    struct thread *thread_b = list_entry(list_front(&semaphore_elem_b->semaphore.waiters), struct thread, elem);
+    return thread_a->priority > thread_b->priority;
+  }
+
+  return false;
+
 }

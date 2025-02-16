@@ -75,7 +75,6 @@ static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
-bool comparePriority (const struct list_elem *list_item_a, const struct list_elem *list_item_b); /* Comparator function for priority comparison */
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -251,6 +250,7 @@ void thread_unblock (struct thread *t)
   intr_set_level (old_level);
 }
 
+/* Function to compare list priority */
 bool comparePriority (const struct list_elem *list_item_a, const struct list_elem *list_item_b) {
   struct thread *thread_a = list_entry(list_item_a, struct thread, elem);
   struct thread *thread_b = list_entry(list_item_b, struct thread, elem);
@@ -338,7 +338,12 @@ void thread_foreach (thread_action_func *func, void *aux)
 void thread_set_priority (int new_priority)
 {
   thread_current ()->priority = new_priority;
-  list_sort(&all_list, comparePriority, NULL); /* Sorts ready list after a thread's priority is changed */
+  enum intr_level oldInterruptLevel = intr_disable(); /* Disable interrupts to ensure atomic list operations */
+  list_sort(&ready_list, comparePriority, NULL); /* Sorts ready_list after a thread's priority is changed */
+  intr_set_level(oldInterruptLevel); /* Set interrupts back to old value */
+  if (!list_empty(&ready_list) && thread_current ()->priority < list_entry(list_front(&ready_list), struct thread, elem)->priority){
+    thread_yield(); /* Yield if current thread's new priority is less than priority of next thread in ready list */
+  }
 }
 
 /* Returns the current thread's priority. */

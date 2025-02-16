@@ -167,14 +167,14 @@ static void timer_interrupt (struct intr_frame *args UNUSED)
   enum intr_level currentInterruptLevel; /* Will hold value of current interrupt level */
   currentInterruptLevel = intr_disable(); /* Disables interrupts and returns the current interrupt value to be stored in variable */
 
-  /* Check sleep_list. Check entire list to see if any threads that can be woken up. If there are any, remove from list and wake thread up. */
+  /* Check sleep_list. Check entire list to see if any threads that can be woken up. If there are any, remove from sleep_list and wakes thread up, and adds to ready_list */
   struct list_elem *e;
   for (e = list_begin (&sleepList); e != list_end (&sleepList); e = list_next (e))
   {
     struct thread *sleepingThread = list_entry (e, struct thread, sleepelem);
     if (sleepingThread->wakeuptime > ticks)
     {
-      continue;
+      continue; /* Not supposed to wake up yet */
     }
     else
     {
