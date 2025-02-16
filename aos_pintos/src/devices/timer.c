@@ -103,7 +103,7 @@ void timer_sleep (int64_t ticks)
 
   currentThread->wakeuptime = timer_ticks() + ticks; /* Sets wake up time of current thread to the current time + ticks */
 
-  list_insert(&sleepList, &currentThread->sleepelem); /* Pass memory address of sleepelem property and sleep_list to add currentThread to sleep_list*/
+  list_push_back(&sleepList, &currentThread->sleepelem); /* Pass memory address of sleepelem property and sleep_list to add currentThread to sleep_list*/
   thread_block(); /* Puts current thread in blocked state (sleep state). To wake up, must call thread_unblock(). This function calls schedule() to allow CPU to schedule next thread */
 
   intr_set_level(currentInterruptLevel); /* Set interrupt level back to what it was previously */
@@ -164,6 +164,9 @@ static void timer_interrupt (struct intr_frame *args UNUSED)
   ticks++;
   thread_tick ();
 
+  enum intr_level currentInterruptLevel; /* Will hold value of current interrupt level */
+  currentInterruptLevel = intr_disable(); /* Disables interrupts and returns the current interrupt value to be stored in variable */
+
   /* Check sleep_list. Check entire list to see if any threads that can be woken up. If there are any, remove from list and wake thread up. */
   struct list_elem *e;
   for (e = list_begin (&sleepList); e != list_end (&sleepList); e = list_next (e))
@@ -179,6 +182,7 @@ static void timer_interrupt (struct intr_frame *args UNUSED)
       list_remove(e); /* Removes sleeping thread from the sleep list */
     }
   }
+  intr_set_level(currentInterruptLevel);
 }
 
 
