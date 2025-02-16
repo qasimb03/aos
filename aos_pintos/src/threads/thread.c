@@ -97,7 +97,6 @@ void thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
-  // list_init (&sleep_list); /* Initalize sleep list */
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -252,8 +251,8 @@ void thread_unblock (struct thread *t)
 }
 
 bool comparePriority (const struct list_elem *list_item_a, const struct list_elem *list_item_b) {
-  struct thread *thread_a = list_entry(list_item_a, struct thread, allelem);
-  struct thread *thread_b = list_entry(list_item_b, struct thread, allelem);
+  struct thread *thread_a = list_entry(list_item_a, struct thread, elem);
+  struct thread *thread_b = list_entry(list_item_b, struct thread, elem);
   return thread_a->priority > thread_b->priority;
 }
 
@@ -311,8 +310,9 @@ void thread_yield (void)
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
-  if (cur != idle_thread)
+  if (cur != idle_thread) {
     list_insert_ordered(&ready_list, &cur->elem, comparePriority, NULL); /* Inserts into ready list in priority order */
+  }
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
