@@ -201,6 +201,10 @@ tid_t thread_create (const char *name, int priority, thread_func *function,
 
   /* Add to run queue. */
   thread_unblock (t);
+  if(t->priority > thread_get_priority()) 
+  {
+    thread_yield(); /* Yield current thread to CPU if incoming thread has higher priority */
+  }
 
   return tid;
 }
@@ -243,10 +247,7 @@ void thread_unblock (struct thread *t)
   struct thread* currentThread = thread_current();
   list_insert_ordered(&ready_list, &t->elem, comparePriority, NULL); /* Insert process in correct order in the ready list */
   t->status = THREAD_READY;
-  if(t->priority > currentThread->priority) 
-  {
-    thread_yield(); /* Yield current thread to CPU if incoming thread has higher priority */
-  }
+  
   intr_set_level (old_level);
 }
 
