@@ -200,11 +200,11 @@ tid_t thread_create (const char *name, int priority, thread_func *function,
 
   /* Add to run queue. */
   thread_unblock (t);
-  if(t->priority > thread_get_priority()) 
-  {
-    thread_yield(); /* Yield current thread to CPU if incoming thread has higher priority */
-  }
 
+  /* Yield to CPU. Allow scheduler to make decisions, including
+  running newly created thread if it has higher priority than the 
+  current thread that was running. */
+  thread_yield();
   return tid;
 }
 

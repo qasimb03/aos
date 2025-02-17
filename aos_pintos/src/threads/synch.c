@@ -104,21 +104,18 @@ void sema_up (struct semaphore *sema)
 {
   
   ASSERT (sema != NULL);
-  struct thread *t;
-  bool unblocked = false;
   
   enum intr_level old_level = intr_disable ();
   if (!list_empty (&sema->waiters)) {
-    t = list_entry(list_pop_front (&sema->waiters), struct thread, elem);
-    thread_unblock (t);
-    unblocked = true;
+    thread_unblock (list_entry(list_pop_front (&sema->waiters), struct thread, elem));
   }
   sema->value++;
 
-  /* If the thread that was just unblocked because it's semaphore value was increased from 0,
-     and that newly unblocked thread that is in the ready queue has a higher priority than 
-     the thread that is currently running, yield the CPU to allow that thread to run. */
-  if (unblocked && t->priority > thread_get_priority()) {
+  /* If not called within an interrupt handler, yield to the CPU.
+   This would, if newly unblocked thread is higher priority, to
+   be run as scheduler would select it from ready_list. CPU might
+   select same thread to run if possible. */
+  if (!intr_context()) {
     thread_yield();  
   }  
   
