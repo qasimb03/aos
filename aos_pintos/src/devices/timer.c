@@ -89,28 +89,10 @@ int64_t timer_elapsed (int64_t then) { return timer_ticks () - then; }
 void timer_sleep (int64_t ticks)
 {
   int64_t start = timer_ticks ();
-
   ASSERT (intr_get_level () == INTR_ON);
 
-
   /* Added code for Project 1 Part 1 */
-  struct thread* currentThread; /* Pointer to current thread */
-  enum intr_level currentInterruptLevel; /* Will hold value of current interrupt level */
-
-  /* Turn interrupts off to can perform atomic operation of adding to sleep list */
-  currentInterruptLevel = intr_disable(); /* Disables interrupts and returns the current interrupt value to be stored in variable */
-  currentThread = thread_current(); /* Stores pointer to current thread in variable */
-
-  currentThread->wakeuptime = timer_ticks() + ticks; /* Sets wake up time of current thread to the current time + ticks */
-
-  list_push_back(&sleepList, &currentThread->sleepelem); /* Pass memory address of sleepelem property and sleep_list to add currentThread to sleep_list*/
-  thread_block(); /* Puts current thread in blocked state (sleep state). To wake up, must call thread_unblock(). This function calls schedule() to allow CPU to schedule next thread */
-
-  intr_set_level(currentInterruptLevel); /* Set interrupt level back to what it was previously */
-
-
-  // while (timer_elapsed (start) < ticks)
-  //   thread_yield ();
+  thread_sleep(timer_ticks() + ticks);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -163,29 +145,8 @@ static void timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
-
-  enum intr_level currentInterruptLevel; /* Will hold value of current interrupt level */
-  currentInterruptLevel = intr_disable(); /* Disables interrupts and returns the current interrupt value to be stored in variable */
-
-  /* Check sleep_list. Check entire list to see if any threads that can be woken up. If there are any, remove from sleep_list and wakes thread up, and adds to ready_list */
-  struct list_elem *e;
-  for (e = list_begin (&sleepList); e != list_end (&sleepList); e = list_next (e))
-  {
-    struct thread *sleepingThread = list_entry (e, struct thread, sleepelem);
-    if (sleepingThread->wakeuptime > ticks)
-    {
-      continue; /* Not supposed to wake up yet */
-    }
-    else
-    {
-      thread_unblock(sleepingThread); /* Unblock sleeping thread that is ready to be woken up */
-      list_remove(e); /* Removes sleeping thread from the sleep list */
-    }
-  }
-  intr_set_level(currentInterruptLevel);
+  check_sleeping_threads(ticks);
 }
-
-
 
 /* Returns true if LOOPS iterations waits for more than one timer
    tick, otherwise false. */

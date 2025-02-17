@@ -31,7 +31,7 @@ static struct list all_list;
 /* List of sleeping processes. Processes are added to this
    list when they call the thread_sleep function and removed
    when their time to sleep has been completed. */
-// static struct list sleep_list;
+static struct list sleep_list;
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -96,6 +96,7 @@ void thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  list_init (&sleep_list);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -139,6 +140,37 @@ void thread_tick (void)
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
+}
+
+void thread_sleep(int wakeUpTime) {
+  enum intr_level currentInterruptLevel; /* Will hold value of current interrupt level */
+  currentInterruptLevel = intr_disable(); /* Disables interrupts and returns the current interrupt value to be stored in variable */
+  struct thread *currentThread = thread_current(); /* Get current thread in order to do operations to sleep it */
+  currentThread->wakeuptime = wakeUpTime; /* Set wake up time of current thread */
+  list_push_back(&sleep_list, &currentThread->sleepelem); /* Pass memory address of sleepelem property and sleep_list to add currentThread to sleep_list*/
+  thread_block(); /* Puts current thread in blocked state (sleep state). To wake up, must call thread_unblock(). This function calls schedule() to allow CPU to schedule next thread */
+  intr_set_level(currentInterruptLevel);
+}
+
+void check_sleeping_threads(int ticks)
+{
+  enum intr_level currentInterruptLevel; /* Will hold value of current interrupt level */
+  currentInterruptLevel = intr_disable(); /* Disables interrupts and returns the current interrupt value to be stored in variable */
+  struct list_elem *e;
+  for (e = list_begin (&sleep_list); e != list_end (&sleep_list); e = list_next (e))
+  {
+    struct thread *sleepingThread = list_entry (e, struct thread, sleepelem);
+    if (sleepingThread->wakeuptime > ticks)
+    {
+      continue; /* Not supposed to wake up yet */
+    }
+    else
+    {
+      thread_unblock(sleepingThread); /* Unblock sleeping thread that is ready to be woken up */
+      list_remove(e); /* Removes sleeping thread from the sleep list */
+    }
+  }
+  intr_set_level(currentInterruptLevel);
 }
 
 /* Prints thread statistics. */

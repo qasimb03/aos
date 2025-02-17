@@ -145,4 +145,8 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
+/* Added functions for Project 1 Alarm Clock */
+void thread_sleep(int);
+void check_sleeping_threads(int);
+
 #endif /* threads/thread.h */
