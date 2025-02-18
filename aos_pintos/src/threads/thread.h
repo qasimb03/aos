@@ -14,7 +14,7 @@ enum thread_status
   THREAD_DYING    /* About to be destroyed. */
 };
 
-bool comparePriority (const struct list_elem *list_item_a, const struct list_elem *list_item_b); /* Function to compare priorities */
+bool compareThreadPriority (const struct list_elem *list_item_a, const struct list_elem *list_item_b); /* Function to compare priorities */
 
 /* Thread identifier type.
    You can redefine this to whatever type you like. */
@@ -130,6 +130,9 @@ tid_t thread_create (const char *name, int priority, thread_func *, void *);
 
 void thread_block (void);
 void thread_unblock (struct thread *);
+
+bool compareThreadPriority (const struct list_elem *list_item_a, const struct list_elem *list_item_b);
+bool compareWaitingThreadsPriority (const struct list_elem *list_item_a, const struct list_elem *list_item_b);
 
 struct thread *thread_current (void);
 tid_t thread_tid (void);

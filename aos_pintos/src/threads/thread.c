@@ -275,17 +275,12 @@ void thread_unblock (struct thread *t)
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
   struct thread* currentThread = thread_current();
-  list_insert_ordered(&ready_list, &t->elem, comparePriority, NULL); /* Insert process in correct order in the ready list */
+  list_insert_ordered(&ready_list, &t->elem, compareThreadPriority, NULL); /* Insert process in correct order in the ready list */
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
 
-/* Function to compare list priority */
-bool comparePriority (const struct list_elem *list_item_a, const struct list_elem *list_item_b) {
-  struct thread *thread_a = list_entry(list_item_a, struct thread, elem);
-  struct thread *thread_b = list_entry(list_item_b, struct thread, elem);
-  return thread_a->priority > thread_b->priority;
-}
+
 
 
 
@@ -344,7 +339,7 @@ void thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) {
-    list_insert_ordered(&ready_list, &cur->elem, comparePriority, NULL); /* Inserts into ready list in priority order */
+    list_insert_ordered(&ready_list, &cur->elem, compareThreadPriority, NULL); /* Inserts into ready list in priority order */
   }
   cur->status = THREAD_READY;
   schedule ();
@@ -370,15 +365,16 @@ void thread_foreach (thread_action_func *func, void *aux)
 void thread_set_priority (int new_priority)
 {
   struct thread *current_thread = thread_current();
-  current_thread->priority = new_priority;
+  current_thread->actual_priority = new_priority; /* Want to change actual priority of the thread, not priority as that can get overridden through donation */
+  current_thread->priority = new_priority; /* Change priority of thread, this may be overwritten due to donation  */
   enum intr_level oldInterruptLevel = intr_disable(); /* Disable interrupts to ensure atomic list operations */
-  list_sort(&ready_list, comparePriority, NULL); /* Sorts ready_list after a thread's priority is changed */
+  list_sort(&ready_list, compareThreadPriority, NULL); /* Sorts ready_list after a thread's priority is changed */
   intr_set_level(oldInterruptLevel); /* Set interrupts back to old value */
 
   
   /* If there are threads still waiting on this thread to release a lock, set priority to priority of highest thread that is waiting on thread to release lock */
   if (!list_empty(&current_thread->threads_waiting_on_this_thread)) {
-    list_sort(&current_thread->threads_waiting_on_this_thread, comparePriority, NULL);
+    list_sort(&current_thread->threads_waiting_on_this_thread, compareWaitingThreadsPriority, NULL);
     if (list_entry(list_front(&current_thread->threads_waiting_on_this_thread), struct thread, threads_waiting_elem)->priority > current_thread->priority)
     {
       current_thread->priority = list_entry(list_front(&current_thread->threads_waiting_on_this_thread), struct thread, threads_waiting_elem)->priority;
@@ -621,3 +617,16 @@ static tid_t allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+bool compareWaitingThreadsPriority (const struct list_elem *list_item_a, const struct list_elem *list_item_b) {
+  struct thread *thread_a = list_entry(list_item_a, struct thread, threads_waiting_elem);
+  struct thread *thread_b = list_entry(list_item_b, struct thread, threads_waiting_elem);
+  return thread_a->priority > thread_b->priority;
+}
+
+/* Function to compare list priority */
+bool compareThreadPriority (const struct list_elem *list_item_a, const struct list_elem *list_item_b) {
+  struct thread *thread_a = list_entry(list_item_a, struct thread, elem);
+  struct thread *thread_b = list_entry(list_item_b, struct thread, elem);
+  return thread_a->priority > thread_b->priority;
+}
