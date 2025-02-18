@@ -142,17 +142,22 @@ void thread_tick (void)
     intr_yield_on_return ();
 }
 
+/* Function to sleep thread to prevent busy waiting */
 void thread_sleep(int wakeUpTime) {
   enum intr_level currentInterruptLevel; /* Will hold value of current interrupt level */
   currentInterruptLevel = intr_disable(); /* Disables interrupts and returns the current interrupt value to be stored in variable */
+  
   struct thread *currentThread = thread_current(); /* Get current thread in order to do operations to sleep it */
   currentThread->wakeuptime = wakeUpTime; /* Set wake up time of current thread */
+
   list_push_back(&sleep_list, &currentThread->sleepelem); /* Pass memory address of sleepelem property and sleep_list to add currentThread to sleep_list*/
   thread_block(); /* Puts current thread in blocked state (sleep state). To wake up, must call thread_unblock(). This function calls schedule() to allow CPU to schedule next thread */
+
   intr_set_level(currentInterruptLevel);
 }
 
-void check_sleeping_threads(int ticks)
+/* Function to check if any sleeping threads ready to be woken up */
+void check_sleeping_threads(int currentSystemTick)
 {
   enum intr_level currentInterruptLevel; /* Will hold value of current interrupt level */
   currentInterruptLevel = intr_disable(); /* Disables interrupts and returns the current interrupt value to be stored in variable */
@@ -160,7 +165,7 @@ void check_sleeping_threads(int ticks)
   for (e = list_begin (&sleep_list); e != list_end (&sleep_list); e = list_next (e))
   {
     struct thread *sleepingThread = list_entry (e, struct thread, sleepelem);
-    if (sleepingThread->wakeuptime > ticks)
+    if (sleepingThread->wakeuptime > currentSystemTick)
     {
       continue; /* Not supposed to wake up yet */
     }
@@ -252,7 +257,7 @@ void thread_block (void)
   ASSERT (intr_get_level () == INTR_OFF);
 
   thread_current ()->status = THREAD_BLOCKED;
-  schedule ();
+  schedule (); /* Call schedule to make CPU run another thread that is not blocked */
 }
 
 /* Transitions a blocked thread T to the ready-to-run state.
@@ -373,13 +378,13 @@ void thread_set_priority (int new_priority)
   enum intr_level oldInterruptLevel = intr_disable(); /* Disable interrupts to ensure atomic list operations */
   list_sort(&ready_list, comparePriority, NULL); /* Sorts ready_list after a thread's priority is changed */
   intr_set_level(oldInterruptLevel); /* Set interrupts back to old value */
-  if (!list_empty(&ready_list) && thread_current ()->priority < list_entry(list_front(&ready_list), struct thread, elem)->priority){
-    thread_yield(); /* Yield if current thread's new priority is less than priority of next thread in ready list */
-  }
+  thread_yield(); /* Yield as new priorities may have caused ready list to have higher priority process than current one */
 }
 
 /* Returns the current thread's priority. */
-int thread_get_priority (void) { return thread_current ()->priority; }
+int thread_get_priority (void) { 
+  return thread_current ()->priority; 
+}
 
 /* Sets the current thread's nice value to NICE. */
 void thread_set_nice (int nice UNUSED)
@@ -489,6 +494,11 @@ static void init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
+  
+  /* Added code for Project 1*/
+  t->wakeuptime = 0; /* Default to prevent any thread from sleeping if not necessary */
+
+  t->actual_priority = 0;
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
