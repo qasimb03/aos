@@ -97,6 +97,11 @@ struct thread
   struct list_elem sleepelem; /* List element for sleeping threads list */
   int64_t wakeuptime; /* Variable for storing wake up time */
 
+  int actual_priority; /* Thread's actual priority before it inherited from a higher process */
+  struct list threads_waiting_on_this_thread; /* List of threads that donated priority to this thread -- these are the threads that are waiting on this thread to release a lock */
+  struct lock *lock_waiting_for; /* Lock that the current thread is waiting on */
+  struct list_elem threads_waiting_elem; /* Used in donors list */
+
   /* Shared between thread.c and synch.c. */
   struct list_elem elem; /* List element. */
 

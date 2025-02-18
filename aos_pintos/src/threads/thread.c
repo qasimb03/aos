@@ -271,19 +271,12 @@ void thread_block (void)
 void thread_unblock (struct thread *t)
 {
   enum intr_level old_level;
-
   ASSERT (is_thread (t));
-
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-
-  /* Non-priority scheduling */
-  // list_push_back (&ready_list, &t->elem);
-
   struct thread* currentThread = thread_current();
   list_insert_ordered(&ready_list, &t->elem, comparePriority, NULL); /* Insert process in correct order in the ready list */
   t->status = THREAD_READY;
-  
   intr_set_level (old_level);
 }
 
@@ -293,6 +286,8 @@ bool comparePriority (const struct list_elem *list_item_a, const struct list_ele
   struct thread *thread_b = list_entry(list_item_b, struct thread, elem);
   return thread_a->priority > thread_b->priority;
 }
+
+
 
 /* Returns the name of the running thread. */
 const char *thread_name (void) { return thread_current ()->name; }
@@ -374,10 +369,22 @@ void thread_foreach (thread_action_func *func, void *aux)
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void thread_set_priority (int new_priority)
 {
-  thread_current ()->priority = new_priority;
+  struct thread *current_thread = thread_current();
+  current_thread->priority = new_priority;
   enum intr_level oldInterruptLevel = intr_disable(); /* Disable interrupts to ensure atomic list operations */
   list_sort(&ready_list, comparePriority, NULL); /* Sorts ready_list after a thread's priority is changed */
   intr_set_level(oldInterruptLevel); /* Set interrupts back to old value */
+
+  
+  /* If there are threads still waiting on this thread to release a lock, set priority to priority of highest thread that is waiting on thread to release lock */
+  if (!list_empty(&current_thread->threads_waiting_on_this_thread)) {
+    list_sort(&current_thread->threads_waiting_on_this_thread, comparePriority, NULL);
+    if (list_entry(list_front(&current_thread->threads_waiting_on_this_thread), struct thread, threads_waiting_elem)->priority > current_thread->priority)
+    {
+      current_thread->priority = list_entry(list_front(&current_thread->threads_waiting_on_this_thread), struct thread, threads_waiting_elem)->priority;
+    }
+  }
+
   thread_yield(); /* Yield as new priorities may have caused ready list to have higher priority process than current one */
 }
 
@@ -497,8 +504,9 @@ static void init_thread (struct thread *t, const char *name, int priority)
   
   /* Added code for Project 1*/
   t->wakeuptime = 0; /* Default to prevent any thread from sleeping if not necessary */
-
-  t->actual_priority = 0;
+  t->actual_priority = priority; 
+  t->lock_waiting_for = NULL; 
+  list_init(&t->threads_waiting_on_this_thread); 
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
